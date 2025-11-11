@@ -13,7 +13,7 @@ def model_summary():
     return {
         "name": "damage_classifier",
         "version": "v1",
-        "description": "Custom CNN classification model for detecting building damage using satellite images",
+        "description": "Custom CNN classification model for detecting Hurricane Harvey building damage using satellite images",
         "input_shape": [128, 128, 3],
         "number_of_parameters": model.count_params()
     }
