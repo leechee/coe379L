@@ -1,0 +1,7 @@
+version: '3.8'
+
+services:
+  damage-classifier:
+    image: leechee1/damage-classifier:latest
+    ports:
+      - "5000:5000"
