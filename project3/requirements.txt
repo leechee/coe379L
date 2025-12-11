@@ -1,6 +1,11 @@
-Flask==2.3.0
-flask-cors==4.0.0
-librosa==0.10.1
+Flask>=3.0.0
+flask-cors>=4.0.0
+librosa>=0.10.1
 soundfile>=0.12.1
-openl3==0.4.1
-numpy>=1.24.0
+openl3>=0.4.2
+numpy>=1.24.0,<2.0.0
+resampy>=0.2.1,<0.3.0
+python-dotenv>=1.0.0
+yt-dlp>=2023.0.0
+tqdm>=4.65.0
+requests>=2.31.0

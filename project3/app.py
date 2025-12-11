@@ -50,7 +50,7 @@ def analyze_audio():
 
             similar_songs = []
             if openl3_embedding:
-                similar_songs = get_similar_songs(openl3_embedding, top_k=10)
+                similar_songs = get_similar_songs(openl3_embedding, top_k=10, uploaded_features=audio_features)
 
             result = {
                 'success': True,
@@ -142,18 +142,28 @@ def cosine_similarity(vec1, vec2):
     return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
 
-def get_similar_songs(embedding, top_k=10):
+def get_similar_songs(embedding, top_k=10, uploaded_features=None):
     if not EMBEDDINGS_DB or not embedding:
         return []
 
     similarities = []
     for song_id, song_data in EMBEDDINGS_DB.items():
-        similarity = cosine_similarity(embedding, song_data['embedding'])
+        # 70% OpenL3 embedding cosine similarity
+        openl3_similarity = cosine_similarity(embedding, song_data['embedding'])
+
+        # 30% Librosa feature similarity (if features available)
+        librosa_similarity = 0
+        if uploaded_features and all(k in song_data for k in ['tempo', 'key', 'mode', 'energy']):
+            librosa_similarity = calculate_librosa_similarity(uploaded_features, song_data)
+
+        # Hybrid formula: 70% OpenL3 + 30% Librosa
+        final_similarity = (0.70 * openl3_similarity) + (0.30 * librosa_similarity)
+
         similarities.append({
             'id': song_id,
             'title': song_data['title'],
             'artist': song_data['artist'],
-            'similarity_score': float(similarity),
+            'similarity_score': float(final_similarity),
             'tempo': song_data.get('tempo'),
             'key': song_data.get('key'),
             'mode': song_data.get('mode')
@@ -161,6 +171,42 @@ def get_similar_songs(embedding, top_k=10):
 
     similarities.sort(key=lambda x: x['similarity_score'], reverse=True)
     return similarities[:top_k]
+
+
+def calculate_librosa_similarity(features1, features2):
+    """Calculate similarity based on Librosa features (tempo, key, energy, brightness)"""
+    score = 0
+    total_weight = 0
+
+    # Tempo similarity (normalized difference, weight 0.3)
+    if 'tempo' in features1 and 'tempo' in features2:
+        tempo_diff = abs(features1['tempo'] - features2['tempo'])
+        tempo_similarity = max(0, 1 - (tempo_diff / 100))  # Normalize by 100 BPM range
+        score += 0.3 * tempo_similarity
+        total_weight += 0.3
+
+    # Key/Mode similarity (exact match, weight 0.3)
+    if 'key' in features1 and 'key' in features2:
+        key_match = 1.0 if (features1['key'] == features2['key'] and
+                           features1.get('mode') == features2.get('mode')) else 0.0
+        score += 0.3 * key_match
+        total_weight += 0.3
+
+    # Energy similarity (normalized difference, weight 0.2)
+    if 'energy' in features1 and 'energy' in features2:
+        energy_diff = abs(features1['energy'] - features2['energy'])
+        energy_similarity = max(0, 1 - energy_diff)
+        score += 0.2 * energy_similarity
+        total_weight += 0.2
+
+    # Brightness similarity (normalized difference, weight 0.2)
+    if 'brightness' in features1 and 'brightness' in features2:
+        brightness_diff = abs(features1['brightness'] - features2['brightness'])
+        brightness_similarity = max(0, 1 - (brightness_diff / 2000))  # Normalize by typical range
+        score += 0.2 * brightness_similarity
+        total_weight += 0.2
+
+    return score / total_weight if total_weight > 0 else 0
 
 
 if __name__ == '__main__':

@@ -8,48 +8,134 @@ This project implements a content-based music recommendation system that uses de
 
 ## Pipeline Architecture
 
-The recommendation pipeline consists of two main components:
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          Input Audio File                            │
+│                         (MP3, WAV format)                            │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │
+                             ▼
+              ┌──────────────────────────────┐
+              │   Audio Preprocessing        │
+              │   - Load audio waveform      │
+              │   - Convert to mono          │
+              │   - Resample if needed       │
+              └──────────┬───────────────────┘
+                         │
+         ┌───────────────┴───────────────┐
+         │                               │
+         ▼                               ▼
+┌────────────────────┐         ┌────────────────────┐
+│  OpenL3 Embedding  │         │ Librosa Features   │
+│  Extraction        │         │ Extraction         │
+├────────────────────┤         ├────────────────────┤
+│ • 512D vector      │         │ • Tempo (BPM)      │
+│ • Timbre           │         │ • Key & Mode       │
+│ • Rhythm           │         │ • Energy (RMS)     │
+│ • Harmonic content │         │ • Brightness       │
+└────────┬───────────┘         └────────┬───────────┘
+         │                               │
+         │      70% weight               │  30% weight
+         └───────────────┬───────────────┘
+                         │
+                         ▼
+              ┌──────────────────────────────┐
+              │   Hybrid Similarity Score    │
+              │                              │
+              │   Final Score = 0.70 × cos   │
+              │   similarity(OpenL3) + 0.30  │
+              │   × Librosa feature match    │
+              └──────────┬───────────────────┘
+                         │
+                         ▼
+              ┌──────────────────────────────┐
+              │  Compare with Database       │
+              │  (Brute-force O(n) search)   │
+              └──────────┬───────────────────┘
+                         │
+                         ▼
+              ┌──────────────────────────────┐
+              │   Top 10 Recommendations     │
+              │   Sorted by similarity score │
+              └──────────────────────────────┘
+```
 
-### 1. OpenL3 Audio Embeddings
+### Pipeline Components
+
+#### 1. OpenL3 Audio Embeddings
 - Pre-trained convolutional neural network trained on Google's AudioSet
 - Converts audio waveforms into 512-dimensional embedding vectors
 - Captures semantic audio features (timbre, rhythm, harmonic content)
 - Similarity measured using cosine similarity between embedding vectors
 
-### 2. Librosa Feature Extraction
+#### 2. Librosa Feature Extraction
 - Tempo detection using beat tracking algorithms
 - Key and mode detection using chroma features and Krumhansl-Schmuckler profiles
 - Energy analysis using RMS (Root Mean Square)
 - Spectral brightness using spectral centroid
 
+#### 3. Hybrid Scoring Formula
+The final similarity score combines both approaches:
+- **70% OpenL3 embeddings**: Captures complex acoustic patterns and perceptual similarity
+- **30% Librosa features**: Ensures compatibility in tempo, key, energy, and brightness
+
 ### Recommendation Process
-1. User uploads an audio file
+1. User uploads an audio file (MP3 or WAV)
 2. System extracts OpenL3 embedding (512D vector) and Librosa features
-3. Cosine similarity computed between upload and all database songs
-4. Top 10 most similar songs returned with similarity scores
+3. Hybrid similarity score computed between upload and all database songs
+4. Top 10 most similar songs returned with similarity scores (0.0-1.0 range)
 
 ## Installation
 
 ### Prerequisites
-- Python 3.10 or higher
-- Conda (recommended) or pip
+- **Python 3.10 or 3.11** (required - Python 3.12+ not yet supported by OpenL3)
+- pip (included with Python)
 
 ### Setup
 
 1. Clone or download this project
 
-2. Create a conda environment:
+2. **Install Python 3.11** if you don't have it:
+   - Download from https://www.python.org/downloads/release/python-31110/
+   - During installation, check "Add Python to PATH"
+   - Verify installation: `python --version` or `py -3.11 --version`
+
+3. Create a virtual environment:
+
+**Windows (PowerShell):**
 ```bash
-conda create -n music-rec python=3.10 -y
-conda activate music-rec
+# If you have Python 3.11 as your default Python:
+python -m venv music-rec
+.\music-rec\Scripts\Activate.ps1
+
+# If you have multiple Python versions installed:
+py -3.11 -m venv music-rec
+.\music-rec\Scripts\Activate.ps1
 ```
 
-3. Install dependencies:
+**Windows (Command Prompt):**
+```bash
+# If you have Python 3.11 as your default Python:
+python -m venv music-rec
+.\music-rec\Scripts\activate.bat
+
+# If you have multiple Python versions installed:
+py -3.11 -m venv music-rec
+.\music-rec\Scripts\activate.bat
+```
+
+**macOS/Linux:**
+```bash
+python3.11 -m venv music-rec
+source music-rec/bin/activate
+```
+
+4. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Set up Last.fm API key:
+5. Set up Last.fm API key:
    - Get a free API key at https://www.last.fm/api/account/create
    - Copy `.env.example` to `.env`
    - Add your API key to `.env`
@@ -63,7 +149,7 @@ python build_database.py
 ```
 
 This script will:
-- Fetch the top 100 songs from Last.fm
+- Fetch the top 999 songs from Last.fm
 - Download audio from YouTube
 - Extract OpenL3 embeddings and Librosa features
 - Save everything to `song_database/embeddings.json`
@@ -72,29 +158,35 @@ This script will:
 
 ## Usage
 
-### Starting the Server
+### Step 1: Start the Flask Server
+
+In your terminal with the virtual environment activated:
 
 ```bash
 python app.py
 ```
 
-The Flask server will start on `http://localhost:5000`
+The Flask server will start on `http://localhost:5000`. Keep this terminal window open.
 
-### Uploading a Song
+### Step 2: Test with Your Music
 
-#### Option 1: Web Interface
+1. **Add your song file** to the project directory (any MP3 or WAV file)
+   - Example: Place `mysong.mp3` in `C:\Users\jasom\Documents\coe379L\project3\`
 
-Open `upload.html` in your browser and use the file upload form.
+2. **Open a new terminal** (keep the server running in the first one)
 
-#### Option 2: Command Line
+3. **Activate the virtual environment** in the new terminal:
+   ```bash
+   .\music-rec\Scripts\Activate.ps1
+   ```
 
-Use the provided test script:
+4. **Run the test script** with your song:
+   ```bash
+   python test_upload.py mysong.mp3
+   ```
 
-```bash
-python test_upload.py path/to/your/song.mp3
-```
+### Example Output
 
-Example output:
 ```
 === Analysis Results ===
 
@@ -196,28 +288,11 @@ COE379 Final Project/
 
 ## Dependencies
 
-- **Flask**: Web framework for API server
-- **OpenL3**: Pre-trained audio embedding model
-- **Librosa**: Audio analysis and feature extraction
-- **SoundFile**: Audio file I/O
-- **NumPy**: Numerical computations
-- **yt-dlp**: YouTube audio downloading
-- **tqdm**: Progress bars
-
-## Limitations
-
-- Database limited to 100 songs (configurable in `build_database.py`)
-- Brute-force similarity search (O(n) complexity)
-- Requires pre-downloaded audio files
-- No real-time streaming support
-
-## Future Enhancements
-
-- Vector database (Pinecone/FAISS) for faster similarity search
-- Larger song database (1000+ songs)
-- Hybrid scoring with user preferences
-- Web-based upload interface
-
-## License
-
-MIT License - Free for academic and personal use
+- **Python 3.11**: Main development language for preprocessing, feature extraction, and similarity computation
+- **Flask**: Web framework providing REST API endpoints for audio upload and analysis
+- **Librosa**: Audio analysis library for extracting musical descriptors (tempo, key) using chroma features and beat tracking algorithms
+- **OpenL3**: Pre-trained deep-learning model (trained on Google's AudioSet) that generates 512-dimensional embedding vectors capturing timbre, rhythm, and harmonic characteristics
+- **NumPy**: Vector manipulation, normalization, and cosine similarity calculations between embeddings
+- **SoundFile**: Audio file I/O for loading WAV and MP3 files
+- **requests**: HTTP library for testing the API with command-line scripts
+- **yt-dlp**: YouTube audio downloading for building the song database from Last.fm track listings
