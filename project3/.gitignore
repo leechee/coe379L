@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+song_database/
+uploads/
+*.mp3
+*.wav

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Music Recommendation System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .upload-section {
+            border: 2px dashed #ccc;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .song {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .features {
+            background-color: #f5f5f5;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Music Recommendation System</h1>
+    <p>Upload an audio file to get similar song recommendations</p>
+
+    <div class="upload-section">
+        <input type="file" id="audioFile" accept="audio/*">
+        <br><br>
+        <button onclick="uploadFile()">Analyze Song</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        function uploadFile() {
+            const fileInput = document.getElementById('audioFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('audio', file);
+
+            document.getElementById('results').innerHTML = '<p>Analyzing...</p>';
+
+            fetch('http://localhost:5000/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayResults(data);
+            })
+            .catch(error => {
+                document.getElementById('results').innerHTML =
+                    '<p style="color: red;">Error: ' + error + '</p>';
+            });
+        }
+
+        function displayResults(data) {
+            let html = '<h2>Analysis Results</h2>';
+
+            html += '<div class="features">';
+            html += '<h3>Audio Features</h3>';
+            html += '<p><strong>Duration:</strong> ' + data.duration.toFixed(2) + ' seconds</p>';
+            html += '<p><strong>Tempo:</strong> ' + data.features.tempo + ' BPM</p>';
+            html += '<p><strong>Key:</strong> ' + data.features.key + ' ' + data.features.mode + '</p>';
+            html += '<p><strong>Energy:</strong> ' + data.features.energy + '</p>';
+            html += '<p><strong>Brightness:</strong> ' + data.features.brightness.toFixed(1) + '</p>';
+            html += '</div>';
+
+            html += '<h3>Top 10 Similar Songs</h3>';
+
+            data.recommendations.forEach((song, index) => {
+                html += '<div class="song">';
+                html += '<strong>' + (index + 1) + '. ' + song.artist + ' - ' + song.title + '</strong><br>';
+                html += 'Similarity: ' + (song.similarity_score * 100).toFixed(1) + '%<br>';
+                if (song.tempo) {
+                    html += 'Tempo: ' + song.tempo + ' BPM, Key: ' + song.key + ' ' + song.mode;
+                }
+                html += '</div>';
+            });
+
+            document.getElementById('results').innerHTML = html;
+        }
+    </script>
+</body>
+</html>
